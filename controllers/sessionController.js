@@ -1,56 +1,51 @@
+// ====== sessionController.js (FULL VERSION) ======
 const User = require('../models/User.js');
 const Session = require('../models/Session.js');
+const { clearActiveCard, getActiveCardId } = require('./scanController');
 
-const wheelCircumference = 2.1; // meter per putaran sepeda statis
-const MET = 6.8; // MET sedang bersepeda (12–13.9 mph menurut ACSM)
+const wheelCircumference = 2.1;
+const MET = 6.8;
 
-// ===== MULAI SESI =====
 const startSession = async (req, res) => {
   const { cardId } = req.body;
   if (!cardId) return res.status(400).json({ message: 'cardId is required' });
-  console.log('Received cardId:', cardId);
 
   try {
     const user = await User.findOne({ cardId });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Hentikan sesi sebelumnya jika belum diakhiri (prevent looping)
-    await Session.updateMany(
-      { userId: user._id, endTime: { $exists: false } },
-      { $set: { endTime: new Date() } }
-    );
+    const dateNow = new Date();
+    const newSession = new Session({ userId: user._id, startTime: dateNow });
+    await newSession.save();
 
-    const existingSession = await Session.findOne({ userId: user._id, endTime: null });
-    if (existingSession) {
-      return res.status(200).json({ message: 'Session already running', sessionId: existingSession._id });
-    }
-
-    const session = new Session({
-      userId: user._id,
-      startTime: new Date()
-    });
-
-    await session.save();
-    res.status(201).json({ message: 'Session started', sessionId: session._id });
+    return res.status(201).json({ message: 'Session started', sessionId: newSession._id });
   } catch (err) {
-    console.error('Error in startSession:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Error in startSession:', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
-// ===== AKHIRI SESI =====
 const endSession = async (req, res) => {
   const { cardId, tickCount } = req.body;
+
+  if (!cardId || tickCount === undefined) {
+    return res.status(400).json({ message: 'cardId and tickCount are required' });
+  }
+
+  const activeCard = getActiveCardId();
+  console.log('🔒 Verifying session owner...');
+  console.log('Active card in system:', activeCard);
+  console.log('Incoming card trying to end:', cardId);
+
+  if (!activeCard || activeCard !== cardId) {
+    return res.status(403).json({ message: 'Unauthorized card. Only session owner can end the session.' });
+  }
 
   try {
     const user = await User.findOne({ cardId });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const session = await Session.findOne({
-      userId: user._id,
-      endTime: { $exists: false }
-    }).sort({ startTime: -1 });
-
+    const session = await Session.findOne({ userId: user._id, endTime: null }).sort({ startTime: -1 });
     if (!session) return res.status(404).json({ message: 'No active session found' });
 
     const endTime = new Date();
@@ -60,20 +55,18 @@ const endSession = async (req, res) => {
     const distanceInMeters = tickCount * wheelCircumference;
     const distanceInKm = distanceInMeters / 1000;
     const avgSpeedKmh = parseFloat((distanceInKm / durationHours).toFixed(2));
-
-    const calories = parseFloat(((MET * 3.5 * user.weight) / 200 * durationMinutes).toFixed(3));
+    const calories = parseFloat(((MET * 3.5 * user.weight) / 200 * durationMinutes).toFixed(2));
 
     session.tickCount = tickCount;
     session.distance = distanceInMeters;
     session.calories = calories;
+    session.avgSpeed = avgSpeedKmh;
     session.endTime = endTime;
 
     await session.save();
+    clearActiveCard();
 
-    console.log("\uD83D\uDCCF Distance (m):", distanceInMeters);
-    console.log("\uD83D\uDD25 Calories burned:", calories);
-
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Session ended',
       sessionId: session._id,
       tickCount,
@@ -81,15 +74,27 @@ const endSession = async (req, res) => {
       calories,
       avgSpeedKmh,
       startTime: session.startTime,
-      endTime
+      endTime,
     });
   } catch (err) {
-    console.error('Error in endSession:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('❌ Error in endSession:', err);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// ===== CEK SESI AKTIF UNTUK POLLING =====
+const checkUserExistence = async (req, res) => {
+  try {
+    const { cardId } = req.body;
+    if (!cardId) return res.status(400).json({ message: 'cardId is required' });
+
+    const user = await User.findOne({ cardId });
+    return res.json({ userExists: !!user });
+  } catch (err) {
+    console.error('❌ Error in checkUserExistence:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 const getLatestActiveSession = async (req, res) => {
   try {
     const latest = await Session.findOne({ endTime: null }).sort({ startTime: -1 });
@@ -98,28 +103,17 @@ const getLatestActiveSession = async (req, res) => {
     const user = await User.findById(latest.userId);
     if (!user) return res.status(404).json({ message: 'User not found for session' });
 
-    res.json({ cardId: user.cardId, userExists: true, startTime: latest.startTime });
+    return res.json({
+      cardId: user.cardId,
+      userExists: true,
+      startTime: latest.startTime
+    });
   } catch (err) {
-    console.error('Error in getLatestActiveSession:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Error in getLatestActiveSession:', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
-// ===== CEK USER SAAT SCAN =====
-const checkUserExistence = async (req, res) => {
-  try {
-    const { cardId } = req.body;
-    if (!cardId) return res.status(400).json({ message: 'cardId is required' });
-
-    const user = await User.findOne({ cardId });
-    res.json({ userExists: !!user });
-  } catch (err) {
-    console.error('Error in checkUserExistence:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// ===== HISTORI SESI =====
 const getSessionHistory = async (req, res) => {
   const { cardId } = req.params;
 
@@ -128,17 +122,17 @@ const getSessionHistory = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const sessions = await Session.find({ userId: user._id }).sort({ startTime: -1 });
-    res.json({ cardId, totalSessions: sessions.length, sessions });
+    return res.json({ cardId, totalSessions: sessions.length, sessions });
   } catch (err) {
-    console.error('Error in getSessionHistory:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('❌ Error in getSessionHistory:', err);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 module.exports = {
+  startSession,
+  endSession,
   checkUserExistence,
   getLatestActiveSession,
-  getSessionHistory,
-  endSession,
-  startSession
+  getSessionHistory
 };

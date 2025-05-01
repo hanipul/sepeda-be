@@ -10,10 +10,26 @@ const sessionSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  endTime: Date,
-  tickCount: Number,
-  distance: Number,
-  calories: Number
+  endTime: {
+    type: Date,
+    require: false,
+    default: null
+  },
+  tickCount: {
+    type: Number,
+    require: false,
+    default: 0
+  },
+  distance:{
+    type: Number,
+    require: false,
+    default: 0
+  },
+  calories: {
+    type: Number,
+    require: false,
+    default: 0
+  }
 }, { timestamps: true });
 
 const session = mongoose.model('Session', sessionSchema);
