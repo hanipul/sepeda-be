@@ -1,14 +1,29 @@
-const User =require( '../models/User.js');
-const Session =require( '../models/Session.js');
+const User = require('../models/User.js');
+const Session = require('../models/Session.js');
 
+const wheelCircumference = 2.1; // meter per putaran sepeda statis
+const MET = 6.8; // MET sedang bersepeda (12–13.9 mph menurut ACSM)
+
+// ===== MULAI SESI =====
 const startSession = async (req, res) => {
   const { cardId } = req.body;
+  if (!cardId) return res.status(400).json({ message: 'cardId is required' });
   console.log('Received cardId:', cardId);
 
   try {
     const user = await User.findOne({ cardId });
-
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Hentikan sesi sebelumnya jika belum diakhiri (prevent looping)
+    await Session.updateMany(
+      { userId: user._id, endTime: { $exists: false } },
+      { $set: { endTime: new Date() } }
+    );
+
+    const existingSession = await Session.findOne({ userId: user._id, endTime: null });
+    if (existingSession) {
+      return res.status(200).json({ message: 'Session already running', sessionId: existingSession._id });
+    }
 
     const session = new Session({
       userId: user._id,
@@ -23,10 +38,7 @@ const startSession = async (req, res) => {
   }
 };
 
-
-
-
-
+// ===== AKHIRI SESI =====
 const endSession = async (req, res) => {
   const { cardId, tickCount } = req.body;
 
@@ -41,17 +53,15 @@ const endSession = async (req, res) => {
 
     if (!session) return res.status(404).json({ message: 'No active session found' });
 
-    const weight = user.weight;
-    const gender = user.gender; // 1 = male, 2 = female
-    const ethnicity = 3; // Assuming all users are Asians
-
-    const distanceInMeters = tickCount * 1.0;
-    const distanceInMiles = distanceInMeters / 1609.34;
-
-    const caloriesPerMile = (0.978 * weight) - (4.571 * gender) + (3.524 * ethnicity) + 32.447;
-    const calories = parseFloat((distanceInMiles * caloriesPerMile).toFixed(3));
-
     const endTime = new Date();
+    const durationMinutes = (endTime - session.startTime) / 60000;
+    const durationHours = durationMinutes / 60;
+
+    const distanceInMeters = tickCount * wheelCircumference;
+    const distanceInKm = distanceInMeters / 1000;
+    const avgSpeedKmh = parseFloat((distanceInKm / durationHours).toFixed(2));
+
+    const calories = parseFloat(((MET * 3.5 * user.weight) / 200 * durationMinutes).toFixed(3));
 
     session.tickCount = tickCount;
     session.distance = distanceInMeters;
@@ -60,21 +70,56 @@ const endSession = async (req, res) => {
 
     await session.save();
 
+    console.log("\uD83D\uDCCF Distance (m):", distanceInMeters);
+    console.log("\uD83D\uDD25 Calories burned:", calories);
+
     res.status(200).json({
       message: 'Session ended',
       sessionId: session._id,
       tickCount,
       distance: distanceInMeters,
       calories,
+      avgSpeedKmh,
       startTime: session.startTime,
       endTime
     });
   } catch (err) {
-    console.error(err);
+    console.error('Error in endSession:', err);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
+// ===== CEK SESI AKTIF UNTUK POLLING =====
+const getLatestActiveSession = async (req, res) => {
+  try {
+    const latest = await Session.findOne({ endTime: null }).sort({ startTime: -1 });
+    if (!latest) return res.status(404).json({ message: 'No active session found' });
+
+    const user = await User.findById(latest.userId);
+    if (!user) return res.status(404).json({ message: 'User not found for session' });
+
+    res.json({ cardId: user.cardId, userExists: true, startTime: latest.startTime });
+  } catch (err) {
+    console.error('Error in getLatestActiveSession:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ===== CEK USER SAAT SCAN =====
+const checkUserExistence = async (req, res) => {
+  try {
+    const { cardId } = req.body;
+    if (!cardId) return res.status(400).json({ message: 'cardId is required' });
+
+    const user = await User.findOne({ cardId });
+    res.json({ userExists: !!user });
+  } catch (err) {
+    console.error('Error in checkUserExistence:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ===== HISTORI SESI =====
 const getSessionHistory = async (req, res) => {
   const { cardId } = req.params;
 
@@ -83,67 +128,10 @@ const getSessionHistory = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const sessions = await Session.find({ userId: user._id }).sort({ startTime: -1 });
-
-    res.status(200).json({
-      cardId,
-      totalSessions: sessions.length,
-      sessions
-    });
+    res.json({ cardId, totalSessions: sessions.length, sessions });
   } catch (err) {
-    console.error(err);
+    console.error('Error in getSessionHistory:', err);
     res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-const getLatestActiveSession = async (req, res) => {
-  try {
-    console.log('🔍 Looking for latest session...');
-    const latest = await Session.findOne({ endTime: null }).sort({ startTime: -1 });
-
-    if (!latest) {
-      console.log('⚠️ No active session found');
-      return res.status(404).json({ message: 'No active session found' });
-    }
-
-    console.log('✅ Found session:', latest);
-    console.log('🔍 Looking for userId:', latest.userId);
-
-    const user = await User.findById(latest.userId);
-
-    if (!user) {
-      console.log('❌ User not found for userId:', latest.userId);
-      return res.status(404).json({ message: 'User not found for latest session' });
-    }
-
-    console.log('✅ Found user:', user);
-
-    res.json({
-      cardId: user.cardId,
-      userExists: true,
-      startTime: latest.startTime
-    });
-  } catch (err) {
-    console.error('❌ Server error in getLatestActiveSession:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-const checkUserExistence = async (req, res) => {
-  try {
-    const { cardId } = req.body;
-    if (!cardId) {
-      return res.status(400).json({ message: 'cardId is required' });
-    }
-
-    const user = await User.findOne({ cardId });
-    if (user) {
-      return res.json({ userExists: true });
-    } else {
-      return res.json({ userExists: false });
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -153,4 +141,4 @@ module.exports = {
   getSessionHistory,
   endSession,
   startSession
-}
+};

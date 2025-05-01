@@ -1,4 +1,3 @@
-// app.js
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -12,6 +11,9 @@ dotenv.config();
 connectDB();
 
 const app = express();
+
+// ✅ JSON parser harus di atas logger
+app.use(express.json());
 
 // 🔥 GLOBAL LOGGER: Semua request masuk akan dicetak
 app.use((req, res, next) => {
@@ -31,15 +33,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// JSON parser
-app.use(express.json());
-
 // Mount routes
 app.use('/users', userRoutes);
 app.use('/sessions', sessionRoutes);
 app.use('/scan', scanRoutes);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
 });
