@@ -1,9 +1,8 @@
-// ====== sessionController.js (FULL VERSION) ======
 const User = require('../models/User.js');
 const Session = require('../models/Session.js');
 const { clearActiveCard, getActiveCardId } = require('./scanController');
 
-const wheelCircumference = 2.1;
+const wheelCircumference = 2.1; // meters
 const MET = 6.8;
 
 const startSession = async (req, res) => {
@@ -55,7 +54,14 @@ const endSession = async (req, res) => {
     const distanceInMeters = tickCount * wheelCircumference;
     const distanceInKm = distanceInMeters / 1000;
     const avgSpeedKmh = parseFloat((distanceInKm / durationHours).toFixed(2));
-    const calories = parseFloat(((MET * 3.5 * user.weight) / 200 * durationMinutes).toFixed(2));
+
+    // Kalori dengan gender-based multiplier
+    let caloriesMultiplier = 1;
+    if (user.gender === 2) { // perempuan
+      caloriesMultiplier = 0.95;
+    }
+
+    const calories = parseFloat(((MET * 3.5 * user.weight * caloriesMultiplier) / 200 * durationMinutes).toFixed(2));
 
     session.tickCount = tickCount;
     session.distance = distanceInMeters;

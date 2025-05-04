@@ -40,3 +40,26 @@ exports.getUserByCardId = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+exports.updateWeight = async (req, res) => {
+  const { weight } = req.body;
+  const { cardId } = req.params;
+
+  if (!weight || isNaN(weight)) {
+    return res.status(400).json({ message: 'Berat badan tidak valid' });
+  }
+
+  try {
+    const user = await User.findOne({ cardId });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.weight = weight;
+    await user.save();
+
+    return res.json({ message: 'Berat badan diperbarui', newWeight: weight });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+

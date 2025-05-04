@@ -12,10 +12,11 @@ connectDB();
 
 const app = express();
 
-// ✅ JSON parser harus di atas logger
+// ✅ Serving static files (HTML, CSS, JS)
+app.use(express.static('public'));  // ✅ Tambahkan ini
+
 app.use(express.json());
 
-// 🔥 GLOBAL LOGGER: Semua request masuk akan dicetak
 app.use((req, res, next) => {
   console.log(`\n===== [${new Date().toISOString()}] ${req.method} ${req.originalUrl} =====`);
   if (req.body && Object.keys(req.body).length > 0) {
@@ -26,14 +27,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Enable CORS
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Mount routes
 app.use('/users', userRoutes);
 app.use('/sessions', sessionRoutes);
 app.use('/scan', scanRoutes);
@@ -42,7 +41,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
 });
-
-
-
-

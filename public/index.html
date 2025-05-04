@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fitness Monitoring</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>SEPEDA STATIS</h1>
+  </header>
+
+  <main>
+    <button onclick="startMonitoring()">Mulai Monitoring</button>
+    <button onclick="promptUpdateWeight()">Update Berat Badan</button>
+
+    <p id="status" style="font-weight: bold; margin-top: 20px;">Waiting for RFID scan...</p>
+    <p id="card-status" style="font-weight: bold; color: green;"></p>
+
+    <div id="results" class="result-box" style="display: none;">
+      <p><strong>Distance:</strong> <span id="distance">0</span> meters</p>
+      <p><strong>Calories Burned:</strong> <span id="calories">0</span> kcal</p>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Fitness Tracker</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
