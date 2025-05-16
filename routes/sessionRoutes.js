@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const sessionController = require('../controllers/sessionController');
 
+router.get('/latest/:cardId', sessionController.getLatestSesion);
 router.post('/start', sessionController.startSession);
 router.post('/end', sessionController.endSession);
 router.post('/check-user', sessionController.checkUserExistence);

@@ -14,7 +14,14 @@ const startSession = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const dateNow = new Date();
-    const newSession = new Session({ userId: user._id, startTime: dateNow });
+    const newSession = new Session(
+      {
+        userId: user._id,
+        startTime: dateNow,
+        endTime: null,
+        status: 'on going',
+      }
+    );
     await newSession.save();
 
     return res.status(201).json({ message: 'Session started', sessionId: newSession._id });
@@ -68,6 +75,7 @@ const endSession = async (req, res) => {
     session.calories = calories;
     session.avgSpeed = avgSpeedKmh;
     session.endTime = endTime;
+    session.status = 'done';
 
     await session.save();
     clearActiveCard();
@@ -135,10 +143,31 @@ const getSessionHistory = async (req, res) => {
   }
 };
 
+const getLatestSesion = async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    if (!cardId) return res.status(400).json({ message: 'cardId is required' });
+    const user = await User.findOne({ cardId });
+    
+    const getLatestSession = await Session.findOne(
+      {
+        userId: user._id,
+        endTime: { $ne: null },
+        status: 'done'
+      }
+    ).sort({ startTime: -1 });
+    return res.status(200).json(getLatestSession);
+  } catch (error) {
+    console.error('❌ Error in getLatestSesion:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   startSession,
   endSession,
   checkUserExistence,
   getLatestActiveSession,
-  getSessionHistory
+  getSessionHistory,
+  getLatestSesion
 };

@@ -15,12 +15,17 @@ const sessionSchema = new mongoose.Schema({
     require: false,
     default: null
   },
+  status: {
+    type: String,
+    enum: ['on going', 'done'],
+    default: 'on going'
+  },
   tickCount: {
     type: Number,
     require: false,
     default: 0
   },
-  distance:{
+  distance: {
     type: Number,
     require: false,
     default: 0
@@ -34,4 +39,4 @@ const sessionSchema = new mongoose.Schema({
 
 const session = mongoose.model('Session', sessionSchema);
 
-module.exports=session;
+module.exports = session;
