@@ -1,6 +1,6 @@
 const User = require('../models/User.js');
 const Session = require('../models/Session.js');
-const { clearActiveCard, getActiveCardId } = require('./scanController');
+const { clearActiveCard, getActiveCardId } = require('./scanController.js');
 
 const wheelCircumference = 2.1; // meters
 const MET = 6.8;
@@ -148,7 +148,7 @@ const getLatestSesion = async (req, res) => {
     const { cardId } = req.params;
     if (!cardId) return res.status(400).json({ message: 'cardId is required' });
     const user = await User.findOne({ cardId });
-    
+
     const getLatestSession = await Session.findOne(
       {
         userId: user._id,
