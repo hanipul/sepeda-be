@@ -1,11 +1,11 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const { connectDB } = require('./v1/config/db');
+const { connectDB } = require('./config/db');
 
-const userRoutes = require('./v1/routes/userRoutes');
-const sessionRoutes = require('./v1/routes/sessionRoutes');
-const scanRoutes = require('./v1/routes/scanRoutes');
+const userRoutes = require('./routes/userRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const scanRoutes = require('./routes/scanRoutes');
 
 dotenv.config();
 connectDB();
