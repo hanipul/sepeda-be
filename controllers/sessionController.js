@@ -53,26 +53,29 @@ const endSession = async (req, res) => {
         if (!session) return res.status(404).json({ message: 'No active session found' });
 
         const endTime = new Date();
+        session.endTime = endTime;  // Update endTime
+        session.status = 'done';    // Update status
+        session.tickCount = tickCount;
 
         // === PERHITUNGAN ===
         const durationMs = endTime - session.startTime;
-        const durationHours = durationMs / (1000 * 60 * 60);
+        const durationHours = durationMs / (1000 * 60 * 60); // Convert milliseconds to hours
 
-        const distance = tickCount * wheelCircumference; // meter
-        const weightKg = user.weight || 60;
-        const calories = MET * weightKg * durationHours;
-        const avgSpeed = (distance / durationMs) * 1000 * 3.6; // km/jam
+        const distance = (tickCount * wheelCircumference).toFixed(1); // meter, dengan 1 angka desimal
+        const weightKg = user.weight || 60; // Default weight to 60 if not found
+
+        // Perhitungan kalori berdasarkan gender
+        const MET = 6.8; // MET value for cycling or relevant activity
+        const calories = (MET * weightKg * durationHours * (user.gender === 1 ? 1.2 : 1.0)).toFixed(1); // Pria = 1.2, Wanita = 1.0
+        const avgSpeed = ((distance / durationMs) * 1000 * 3.6).toFixed(1); // km/jam, dengan 1 angka desimal
 
         // === SIMPAN NILAI ===
-        session.endTime = endTime;
-        session.status = 'done';
-        session.tickCount = tickCount;
         session.distance = distance;
         session.calories = calories;
         session.avgSpeed = avgSpeed;
 
         await session.save();
-        clearActiveCard();
+        clearActiveCard(); // Clear active card after session ends
 
         return res.status(200).json({
             message: 'Session ended',
@@ -89,6 +92,7 @@ const endSession = async (req, res) => {
         return res.status(500).json({ message: 'Internal server error' });
     }
 };
+
 
 
 // Fungsi untuk memeriksa keberadaan pengguna berdasarkan cardId
