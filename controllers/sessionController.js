@@ -53,20 +53,34 @@ const endSession = async (req, res) => {
         if (!session) return res.status(404).json({ message: 'No active session found' });
 
         const endTime = new Date();
-        session.endTime = endTime;  // Update endTime
-        session.status = 'done';    // Update status
+
+        // === PERHITUNGAN ===
+        const durationMs = endTime - session.startTime;
+        const durationHours = durationMs / (1000 * 60 * 60);
+
+        const distance = tickCount * wheelCircumference; // meter
+        const weightKg = user.weight || 60;
+        const calories = MET * weightKg * durationHours;
+        const avgSpeed = (distance / durationMs) * 1000 * 3.6; // km/jam
+
+        // === SIMPAN NILAI ===
+        session.endTime = endTime;
+        session.status = 'done';
         session.tickCount = tickCount;
+        session.distance = distance;
+        session.calories = calories;
+        session.avgSpeed = avgSpeed;
 
         await session.save();
-        clearActiveCard(); // Pastikan sesi aktif dihapus setelah selesai
+        clearActiveCard();
 
         return res.status(200).json({
             message: 'Session ended',
             sessionId: session._id,
             tickCount,
-            distance: session.distance,
-            calories: session.calories,
-            avgSpeed: session.avgSpeed,
+            distance,
+            calories,
+            avgSpeed,
             startTime: session.startTime,
             endTime,
         });
@@ -75,6 +89,7 @@ const endSession = async (req, res) => {
         return res.status(500).json({ message: 'Internal server error' });
     }
 };
+
 
 // Fungsi untuk memeriksa keberadaan pengguna berdasarkan cardId
 const checkUserExistence = async (req, res) => {
