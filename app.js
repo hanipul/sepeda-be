@@ -28,7 +28,7 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-  origin: 'http://localhost:5173', // Pastikan ini benar
+  origin: 'https://monitoringsepedateluapp.my.id', // Pastikan ini benar
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
